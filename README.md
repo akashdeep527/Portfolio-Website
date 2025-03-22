@@ -9,15 +9,16 @@ A modern, responsive portfolio website built with React, TypeScript, and Tailwin
 - **Responsive Design**: Optimized for all devices from mobile to desktop
 - **Modern UI**: Clean, professional design using Tailwind CSS
 - **TypeScript**: Type-safe code for better developer experience and fewer bugs
-- **MongoDB Integration**: Store and retrieve portfolio data using MongoDB
+- **Supabase Integration**: Store and retrieve portfolio data using Supabase
+- **Authentication**: User authentication via Supabase Auth
 
 ## Tech Stack
 
 - **Frontend**: React, TypeScript, Tailwind CSS
-- **Backend**: Node.js (optional)
-- **Database**: MongoDB
+- **Backend**: Supabase (Backend as a Service)
+- **Database**: PostgreSQL (via Supabase)
 - **Hosting**: Netlify
-- **Authentication**: Firebase Authentication
+- **Authentication**: Supabase Auth
 
 ## Project Structure
 
@@ -26,7 +27,10 @@ A modern, responsive portfolio website built with React, TypeScript, and Tailwin
 │   ├── components/     # React components
 │   │   ├── admin/      # Admin dashboard components
 │   │   └── auth/       # Authentication components
+│   ├── config/         # Configuration files
+│   │   └── supabase.ts # Supabase client configuration
 │   ├── context/        # React context providers
+│   ├── services/       # Service layer for API operations
 │   ├── data.ts         # Static data
 │   ├── types.ts        # TypeScript types
 │   ├── App.tsx         # Main application component
@@ -41,7 +45,19 @@ A modern, responsive portfolio website built with React, TypeScript, and Tailwin
 
 - Node.js (v16 or later)
 - npm or yarn
-- MongoDB Atlas account (for database features)
+- Supabase account (free tier available)
+
+### Supabase Setup
+
+1. Create a free Supabase account at [supabase.com](https://supabase.com)
+2. Create a new project
+3. Set up the following tables in Supabase:
+   - profiles
+   - experiences
+   - education
+   - skills
+   - languages
+4. Get your Supabase URL and anon key from the project API settings
 
 ### Installation
 
@@ -58,13 +74,8 @@ A modern, responsive portfolio website built with React, TypeScript, and Tailwin
 
 3. Create a `.env` file in the root directory with the following variables:
    ```
-   VITE_FIREBASE_API_KEY=your_firebase_api_key
-   VITE_FIREBASE_AUTH_DOMAIN=your_firebase_auth_domain
-   VITE_FIREBASE_PROJECT_ID=your_firebase_project_id
-   VITE_FIREBASE_STORAGE_BUCKET=your_firebase_storage_bucket
-   VITE_FIREBASE_MESSAGING_SENDER_ID=your_firebase_messaging_sender_id
-   VITE_FIREBASE_APP_ID=your_firebase_app_id
-   VITE_MONGODB_URI=your_mongodb_connection_string
+   VITE_SUPABASE_URL=your-supabase-url
+   VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
    ```
 
 4. Start the development server
@@ -104,18 +115,66 @@ This project is configured for deployment on Netlify. The `netlify.toml` file co
 To access the admin dashboard:
 
 1. Navigate to `/admin`
-2. Log in with admin credentials
+2. Log in with your Supabase account credentials
 3. Use the dashboard to update your resume information
 
 ## Customization
 
 ### Updating Resume Data
 
-Edit the data in the admin dashboard or modify the `src/data.ts` file directly.
+Edit the data in the admin dashboard, which will save to your Supabase database.
 
 ### Changing the Theme
 
 Modify the `tailwind.config.js` file to update colors, fonts, and other theme settings.
+
+## Supabase Database Schema
+
+The database uses the following schema:
+
+1. **profiles**: User profile information
+   - id (uuid, primary key, references auth.users.id)
+   - full_name (text)
+   - title (text)
+   - about (text)
+   - email (text)
+   - phone (text)
+   - location (text)
+   - website (text)
+   - avatar_url (text, optional)
+
+2. **experiences**: Work experiences
+   - id (int8, primary key)
+   - user_id (uuid, references profiles.id)
+   - company (text)
+   - position (text)
+   - start_date (date)
+   - end_date (date, optional)
+   - description (text)
+   - current (boolean)
+
+3. **education**: Educational background
+   - id (int8, primary key)
+   - user_id (uuid, references profiles.id)
+   - institution (text)
+   - degree (text)
+   - field (text)
+   - start_date (date)
+   - end_date (date, optional)
+   - description (text)
+
+4. **skills**: Professional skills
+   - id (int8, primary key)
+   - user_id (uuid, references profiles.id)
+   - name (text)
+   - level (int2, 1-5 for skill level)
+   - category (text)
+
+5. **languages**: Language proficiency
+   - id (int8, primary key)
+   - user_id (uuid, references profiles.id)
+   - name (text)
+   - proficiency (text, e.g., 'Fluent', 'Intermediate', 'Beginner')
 
 ## Contributing
 
@@ -129,5 +188,5 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 - React team for the amazing framework
 - Tailwind CSS for the utility-first CSS framework
-- MongoDB for the flexible database solution
+- Supabase for the powerful backend-as-a-service
 - Netlify for the easy deployment platform 
