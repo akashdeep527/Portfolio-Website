@@ -28,9 +28,19 @@ function Resume() {
   }, []);
 
   const handleLogout = async () => {
-    await logout();
-    // Force a page refresh to ensure all auth state is cleared
-    window.location.href = '/';
+    try {
+      await logout();
+      
+      // Short delay to ensure all state is cleared
+      setTimeout(() => {
+        // Force a full page reload, clearing browser state
+        window.location.replace('/');
+      }, 100);
+    } catch (error) {
+      console.error("Error during logout:", error);
+      // If there's an error, still attempt to redirect
+      window.location.href = '/';
+    }
   };
 
   return (

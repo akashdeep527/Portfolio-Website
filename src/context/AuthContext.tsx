@@ -65,7 +65,41 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
+    try {
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error("Error signing out:", error.message);
+      }
+      
+      // Clear state manually to ensure clean logout
+      setSession(null);
+      setUser(null);
+      setIsAuthenticated(false);
+      
+      // Clear any Supabase-related cookies and local storage
+      try {
+        // Clear supabase-related items from localStorage
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('supabase') || key.includes('auth')) {
+            localStorage.removeItem(key);
+          }
+        });
+        
+        // Clear session cookies if possible
+        document.cookie.split(';').forEach(c => {
+          const cookie = c.trim();
+          if (cookie.startsWith('sb-')) {
+            document.cookie = cookie.split('=')[0] + '=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+          }
+        });
+      } catch (e) {
+        console.error("Error clearing browser storage:", e);
+      }
+    } catch (err) {
+      console.error("Failed to log out:", err);
+    }
   };
 
   return (
