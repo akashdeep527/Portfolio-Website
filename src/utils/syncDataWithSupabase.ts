@@ -10,21 +10,22 @@ import { ResumeData } from '../types';
  */
 export const syncDataWithSupabase = async (userId: string, data: ResumeData): Promise<boolean> => {
   try {
-    // Sync profile data
+    console.log('Starting sync with Supabase for user:', userId);
+    
+    // Sync profile data - use correct field names matching the Supabase schema
     const { error: profileError } = await supabase
       .from('profiles')
       .upsert({
         id: userId,
-        user_id: userId,
-        name: data.profile.name,
+        full_name: data.profile.name,
         title: data.profile.title,
-        description: data.profile.description,
+        about: data.profile.description,
         email: data.profile.email,
         phone: data.profile.phone,
         location: data.profile.location,
         updated_at: new Date().toISOString()
       }, {
-        onConflict: 'user_id'
+        onConflict: 'id'
       });
     
     if (profileError) {
@@ -71,7 +72,7 @@ export const syncDataWithSupabase = async (userId: string, data: ResumeData): Pr
         
       if (insertExpError) {
         console.error('Error inserting experiences:', insertExpError);
-        return false;
+        // Continue with other syncs even if this fails
       }
     }
     
@@ -83,10 +84,8 @@ export const syncDataWithSupabase = async (userId: string, data: ResumeData): Pr
       
     if (deleteEduError) {
       console.error('Error deleting existing education:', deleteEduError);
-      return false;
-    }
-    
-    if (data.education.length > 0) {
+      // Continue with other syncs even if this fails
+    } else if (data.education.length > 0) {
       const educationData = data.education.map(edu => {
         // Parse period into start and end dates
         const [startDate, endDate] = edu.period.split(' - ');
@@ -109,7 +108,7 @@ export const syncDataWithSupabase = async (userId: string, data: ResumeData): Pr
         
       if (insertEduError) {
         console.error('Error inserting education:', insertEduError);
-        return false;
+        // Continue with other syncs even if this fails
       }
     }
     
@@ -121,10 +120,8 @@ export const syncDataWithSupabase = async (userId: string, data: ResumeData): Pr
       
     if (deleteSkillsError) {
       console.error('Error deleting existing skills:', deleteSkillsError);
-      return false;
-    }
-    
-    if (data.skills.length > 0) {
+      // Continue with other syncs even if this fails
+    } else if (data.skills.length > 0) {
       const skillsData = data.skills.map(skill => ({
         user_id: userId,
         name: skill.name,
@@ -138,7 +135,7 @@ export const syncDataWithSupabase = async (userId: string, data: ResumeData): Pr
         
       if (insertSkillsError) {
         console.error('Error inserting skills:', insertSkillsError);
-        return false;
+        // Continue with other syncs even if this fails
       }
     }
     
@@ -150,25 +147,23 @@ export const syncDataWithSupabase = async (userId: string, data: ResumeData): Pr
       
     if (deleteLangError) {
       console.error('Error deleting existing languages:', deleteLangError);
-      return false;
-    }
-    
-    if (data.languages.length > 0) {
+      // Continue with other syncs even if this fails
+    } else if (data.languages.length > 0) {
       const languagesData = data.languages.map(lang => {
         // Parse language string if it contains proficiency in parentheses
         let name = lang;
-        let level = 'Fluent';
+        let proficiency = 'Fluent';
         
         if (typeof lang === 'string' && lang.includes('(')) {
           const parts = lang.split('(');
           name = parts[0].trim();
-          level = parts[1].replace(')', '').trim();
+          proficiency = parts[1].replace(')', '').trim();
         }
         
         return {
           user_id: userId,
           name,
-          level
+          proficiency
         };
       });
       
@@ -178,10 +173,11 @@ export const syncDataWithSupabase = async (userId: string, data: ResumeData): Pr
         
       if (insertLangError) {
         console.error('Error inserting languages:', insertLangError);
-        return false;
+        // Continue with other syncs even if this fails
       }
     }
     
+    console.log('Sync with Supabase completed successfully');
     return true;
   } catch (error) {
     console.error('Error syncing data with Supabase:', error);

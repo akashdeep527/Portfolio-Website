@@ -86,6 +86,13 @@ const mapSupabaseToResumeData = async (userId: string): Promise<ResumeData> => {
   }
 };
 
+// Create a simple fallback function for the syncAllData
+// This will allow the application to at least load even if the sync functionality fails
+const syncAllDataFallback = async (): Promise<boolean> => {
+  console.warn('Using syncAllData fallback function - sync functionality disabled');
+  return false;
+};
+
 export const ResumeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user, isAuthenticated } = useAuth();
   const userId = user?.id || 'guest';
@@ -260,7 +267,7 @@ export const ResumeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     // Note: This doesn't delete data from Supabase, just resets the local state
   };
 
-  // Function to sync all data to Supabase
+  // Update the syncAllData function in the ResumeProvider component
   const syncAllData = async (): Promise<boolean> => {
     if (!isAuthenticated || !user) {
       console.error('Cannot sync data: User not authenticated');
@@ -269,7 +276,12 @@ export const ResumeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     
     setIsSyncing(true);
     try {
+      console.log('Starting data sync with Supabase, user ID:', user.id);
+      console.log('Data to sync:', JSON.stringify(data).substring(0, 200) + '...');
+      
+      // Wrap the sync call in a try/catch to prevent it from breaking the entire app
       const success = await syncDataWithSupabase(user.id, data);
+      
       if (success) {
         console.log('All data successfully synced with Supabase');
       } else {
@@ -277,7 +289,7 @@ export const ResumeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       }
       return success;
     } catch (error) {
-      console.error('Error syncing data with Supabase:', error);
+      console.error('Error in syncAllData function:', error);
       return false;
     } finally {
       setIsSyncing(false);
