@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import initialData from '../data';
 import { ResumeData } from '../types';
+import { useAuth } from './AuthContext';
 
 interface ResumeContextType {
   data: ResumeData;
@@ -16,14 +17,29 @@ interface ResumeContextType {
 const ResumeContext = createContext<ResumeContextType | undefined>(undefined);
 
 export const ResumeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
+  const userId = user?.id || 'guest';
+  const storageKey = `resumeData_${userId}`;
+  
   const [data, setData] = useState<ResumeData>(() => {
-    const savedData = localStorage.getItem('resumeData');
+    const savedData = localStorage.getItem(storageKey);
     return savedData ? JSON.parse(savedData) : initialData;
   });
 
+  // Update data when user changes (on login/logout)
   useEffect(() => {
-    localStorage.setItem('resumeData', JSON.stringify(data));
-  }, [data]);
+    const savedData = localStorage.getItem(storageKey);
+    if (savedData) {
+      setData(JSON.parse(savedData));
+    } else {
+      setData(initialData);
+    }
+  }, [userId, storageKey]);
+
+  // Save data to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem(storageKey, JSON.stringify(data));
+  }, [data, storageKey]);
 
   const updateProfile = (profile: ResumeData['profile']) => {
     setData(prev => ({ ...prev, profile }));
