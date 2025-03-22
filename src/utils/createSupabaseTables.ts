@@ -107,8 +107,8 @@ export const createSupabaseTables = async () => {
       { name: 'languages', sql: createLanguagesTable }
     ];
     
-    const createdTables = [];
-    const failedTables = [];
+    const createdTables: string[] = [];
+    const failedTables: Array<{name: string, error: string}> = [];
     
     // Check which tables need to be created
     for (const table of tablesToCreate) {

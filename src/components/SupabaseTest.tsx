@@ -31,15 +31,24 @@ const SupabaseTest: React.FC = () => {
             tables: result.tables || []
           });
         } else {
-          // If the error is about pg_tables, it's okay - we just need to create the tables
-          if (result.error && result.error.includes('pg_tables')) {
+          // Check if we have some existing tables but not all
+          if (result.existingTables && result.existingTables.length > 0) {
             setStatus({
               connected: true,
-              message: 'Connected to Supabase, but tables may need to be created',
+              message: 'Connected to Supabase, but some tables need to be created',
               tables: result.existingTables || [],
-              error: 'Could not check all tables'
+              error: result.error
+            });
+          } else if (result.error && result.error.includes('does not exist')) {
+            // Tables don't exist, but the connection works
+            setStatus({
+              connected: true,
+              message: 'Connected to Supabase, but tables need to be created',
+              tables: [],
+              error: 'No tables found. Please create tables.'
             });
           } else {
+            // General connection error
             setStatus({
               connected: false,
               message: 'Failed to connect to Supabase',
@@ -143,7 +152,7 @@ const SupabaseTest: React.FC = () => {
       
       <div className={`p-4 mb-4 rounded-md ${status.connected ? 'bg-green-100 dark:bg-green-900' : 'bg-red-100 dark:bg-red-900'}`}>
         <p className={`font-medium ${status.connected ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}`}>
-          {status.message}
+          {status.connected ? status.message : 'Failed to connect to Supabase'}
         </p>
         
         {status.error && (

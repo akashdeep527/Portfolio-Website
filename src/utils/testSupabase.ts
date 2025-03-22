@@ -10,19 +10,14 @@ export const testSupabaseConnection = async () => {
   try {
     console.log('Testing Supabase connection...');
     
-    // Simple check if we can reach Supabase at all
-    const { data: healthCheck, error: healthError } = await supabase.rpc('get_service_status').select();
+    // Simple check if we can reach Supabase at all - using a simpler method
+    const { data: configData, error: configError } = await supabase.from('_config').select('name').limit(1).maybeSingle();
     
-    if (healthError) {
-      if (healthError.message.includes('relation "public.pg_tables" does not exist')) {
-        // This error is expected, we can still proceed
-        console.log('Cannot access pg_tables, but connection appears to be working');
-      } else {
-        console.error('Error connecting to Supabase:', healthError.message);
-        return { success: false, error: healthError.message };
-      }
+    if (configError && !configError.message.includes('does not exist')) {
+      console.error('Error connecting to Supabase:', configError.message);
+      return { success: false, error: configError.message };
     } else {
-      console.log('Supabase health check successful:', healthCheck);
+      console.log('Supabase connection appears to be working');
     }
     
     // Check each table by trying to select from it
