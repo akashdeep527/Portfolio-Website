@@ -19,6 +19,10 @@ const SupabaseTest: React.FC = () => {
   const [isInitializing, setIsInitializing] = useState(false);
   const [isCreatingTables, setIsCreatingTables] = useState(false);
   const [sqlInstructions, setSqlInstructions] = useState<string | null>(null);
+  const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false);
+  const [adminMode, setAdminMode] = useState(false);
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
 
   useEffect(() => {
     const checkConnection = async () => {
@@ -73,6 +77,7 @@ const SupabaseTest: React.FC = () => {
 
   const handleInitialize = async () => {
     setIsInitializing(true);
+    setNeedsEmailConfirmation(false);
     
     try {
       const result = await initializeSupabase();
@@ -83,8 +88,17 @@ const SupabaseTest: React.FC = () => {
           message: 'Supabase initialized successfully!'
         }));
       } else {
+        // Check if the error is about email confirmation
+        if (result.needsConfirmation) {
+          setNeedsEmailConfirmation(true);
+          setStatus(prev => ({
+            ...prev,
+            message: 'User requires email confirmation',
+            error: result.error
+          }));
+        }
         // If the error is about the table not existing, suggest creating tables first
-        if (result.error && result.error.includes('does not exist')) {
+        else if (result.error && result.error.includes('does not exist')) {
           setStatus(prev => ({
             ...prev,
             message: 'Tables need to be created first',
@@ -148,6 +162,70 @@ const SupabaseTest: React.FC = () => {
       }));
     } finally {
       setIsCreatingTables(false);
+    }
+  };
+
+  const handleAdminSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsInitializing(true);
+    
+    try {
+      // Try to sign in with admin provided credentials
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: adminEmail,
+        password: adminPassword
+      });
+      
+      if (error) {
+        setStatus(prev => ({
+          ...prev,
+          message: 'Admin sign-in failed',
+          error: error.message
+        }));
+      } else if (data?.user) {
+        // Successfully signed in
+        setStatus(prev => ({
+          ...prev,
+          message: 'Signed in as admin user',
+          error: undefined
+        }));
+        
+        // Create profile if needed
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+          
+        if (!profile && !profileError) {
+          const { error: insertError } = await supabase
+            .from('profiles')
+            .insert({
+              id: data.user.id,
+              full_name: 'Admin User',
+              title: 'Portfolio Admin',
+              email: adminEmail
+            });
+            
+          if (insertError) {
+            console.error('Error creating admin profile:', insertError);
+          } else {
+            setStatus(prev => ({
+              ...prev,
+              message: 'Signed in and created admin profile',
+              error: undefined
+            }));
+          }
+        }
+      }
+    } catch (error) {
+      setStatus(prev => ({
+        ...prev,
+        message: 'Error during admin sign-in',
+        error: String(error)
+      }));
+    } finally {
+      setIsInitializing(false);
     }
   };
 
@@ -222,6 +300,68 @@ const SupabaseTest: React.FC = () => {
         <p className="text-gray-600 dark:text-gray-400">Email: test.user@gmail.com</p>
         <p className="text-gray-600 dark:text-gray-400">Password: Password123!</p>
       </div>
+      
+      {needsEmailConfirmation && (
+        <div className="mt-6 p-4 bg-yellow-100 dark:bg-yellow-900 border border-yellow-400 dark:border-yellow-700 rounded-md">
+          <h3 className="font-semibold text-yellow-800 dark:text-yellow-300 mb-2">Email Confirmation Required</h3>
+          <p className="text-sm text-yellow-800 dark:text-yellow-300 mb-2">
+            The test user email (test.user@gmail.com) needs verification before you can sign in.
+          </p>
+          
+          <div className="mt-4">
+            <button 
+              onClick={() => setAdminMode(!adminMode)}
+              className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+            >
+              {adminMode ? 'Hide Admin Login' : 'Use Your Own Credentials Instead'}
+            </button>
+            
+            {adminMode ? (
+              <form onSubmit={handleAdminSignIn} className="mt-4">
+                <p className="text-sm text-yellow-800 dark:text-yellow-300 mb-3">
+                  Enter your Supabase credentials to bypass the test user:
+                </p>
+                <div className="space-y-3">
+                  <input
+                    type="email"
+                    placeholder="Your Email"
+                    value={adminEmail}
+                    onChange={(e) => setAdminEmail(e.target.value)}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                    required
+                  />
+                  <input
+                    type="password"
+                    placeholder="Your Password"
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                    className="w-full px-3 py-2 border rounded text-sm"
+                    required
+                  />
+                  <button
+                    type="submit"
+                    className="w-full px-3 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700 disabled:bg-green-400"
+                    disabled={isInitializing}
+                  >
+                    {isInitializing ? 'Signing In...' : 'Sign In with Your Account'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="mt-4">
+                <p className="text-sm text-yellow-800 dark:text-yellow-300">
+                  Or, you can try one of these options:
+                </p>
+                <ul className="list-disc pl-5 mt-2 text-sm text-yellow-800 dark:text-yellow-300">
+                  <li>Go to your Supabase dashboard, navigate to Authentication &gt; Users, find test.user@gmail.com and confirm the email manually</li>
+                  <li>Check your Supabase logs or email service for the confirmation email</li>
+                  <li>In the Supabase dashboard, go to Authentication &gt; Settings and disable email confirmation for testing</li>
+                </ul>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -85,6 +85,10 @@ const Login: React.FC = () => {
             {isLoading ? 'Logging in...' : 'Login'}
           </button>
         </form>
+
+        <div className="mt-6 text-center">
+          <a href="/" className="text-blue-400 hover:text-blue-300">Return to Home</a>
+        </div>
       </div>
     </div>
   );

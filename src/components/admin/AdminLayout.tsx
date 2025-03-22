@@ -7,9 +7,10 @@ const AdminLayout: React.FC = () => {
   const { logout } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    logout();
-    navigate('/admin');
+  const handleLogout = async () => {
+    await logout();
+    // Force a page refresh to ensure all auth state is cleared
+    window.location.href = '/';
   };
 
   return (

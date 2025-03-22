@@ -118,7 +118,11 @@ export const initializeSupabase = async () => {
       
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: testEmail,
-        password: testPassword
+        password: testPassword,
+        options: {
+          // Skip email verification for test user
+          emailRedirectTo: window.location.origin
+        }
       });
       
       if (signUpError) {
@@ -156,6 +160,16 @@ export const initializeSupabase = async () => {
     // Any other error
     if (signInError) {
       console.error('Error checking for existing user:', signInError);
+      
+      // Special handling for email not confirmed error
+      if (signInError.message.includes('Email not confirmed')) {
+        return { 
+          success: false, 
+          error: 'Email not confirmed. For testing purposes, you can login to Supabase dashboard and manually confirm the email or check the Supabase dashboard for the confirmation link.',
+          needsConfirmation: true 
+        };
+      }
+      
       return { success: false, error: signInError.message };
     }
     

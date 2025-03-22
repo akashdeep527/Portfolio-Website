@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Car, Briefcase, GraduationCap, Languages, Award, Mail, Phone, MapPin, ChevronRight, PenTool as Tool, Gauge, Target } from 'lucide-react';
+import { Car, Briefcase, GraduationCap, Languages, Award, Mail, Phone, MapPin, ChevronRight, PenTool as Tool, Gauge, Target, LogOut, User } from 'lucide-react';
 import { useResume } from '../context/ResumeContext';
+import { useAuth } from '../context/AuthContext';
+import { Link } from 'react-router-dom';
 
 const iconMap: Record<string, React.ReactNode> = {
   Gauge: <Gauge className="w-12 h-12 text-blue-400 mx-auto mb-4" />,
@@ -10,6 +12,7 @@ const iconMap: Record<string, React.ReactNode> = {
 
 function Resume() {
   const { data } = useResume();
+  const { isAuthenticated, user, logout } = useAuth();
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
@@ -24,8 +27,51 @@ function Resume() {
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, []);
 
+  const handleLogout = async () => {
+    await logout();
+    // Force a page refresh to ensure all auth state is cleared
+    window.location.href = '/';
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white">
+      {/* Auth Buttons */}
+      <div className="absolute top-4 right-4 z-20 flex space-x-4">
+        {isAuthenticated ? (
+          <>
+            <Link 
+              to="/admin" 
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded shadow transition-colors flex items-center"
+            >
+              <User className="w-4 h-4 mr-2" />
+              Admin Panel
+            </Link>
+            <button 
+              onClick={handleLogout} 
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded shadow transition-colors flex items-center"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              Logout
+            </button>
+          </>
+        ) : (
+          <>
+            <Link 
+              to="/login" 
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded shadow transition-colors"
+            >
+              Login
+            </Link>
+            <Link 
+              to="/signup" 
+              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded shadow transition-colors"
+            >
+              Sign Up
+            </Link>
+          </>
+        )}
+      </div>
+      
       {/* Hero Section */}
       <header className="relative h-[50vh] flex items-center justify-center overflow-hidden">
         <div 

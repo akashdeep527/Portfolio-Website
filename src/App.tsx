@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Resume from './components/Resume';
 import Login from './components/auth/Login';
+import SignUp from './components/auth/SignUp';
 import AdminLayout from './components/admin/AdminLayout';
 import Dashboard from './components/admin/Dashboard';
 import ProfileEditor from './components/admin/ProfileEditor';
@@ -23,6 +24,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Resume />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<SignUp />} />
             <Route path="/supabase-test" element={<SupabaseTest />} />
             <Route 
               path="/admin" 
