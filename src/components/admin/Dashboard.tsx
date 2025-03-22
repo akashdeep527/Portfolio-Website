@@ -14,20 +14,20 @@ const Dashboard: React.FC = () => {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <h1 className="text-3xl font-bold text-white">Dashboard</h1>
-        <div className="flex gap-4">
+        <div className="flex flex-wrap gap-3">
           <Link 
             to="/" 
             target="_blank"
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded"
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm sm:text-base"
           >
             <Eye size={18} />
             <span>View Resume</span>
           </Link>
           <button 
             onClick={handleReset}
-            className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded"
+            className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm sm:text-base"
           >
             <RefreshCw size={18} />
             <span>Reset Data</span>
@@ -35,7 +35,7 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-8">
         <div className="bg-gray-800 p-6 rounded-lg shadow-md">
           <div className="flex items-center gap-3 mb-4">
             <User className="w-6 h-6 text-blue-400" />
