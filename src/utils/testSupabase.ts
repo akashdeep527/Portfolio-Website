@@ -4,30 +4,47 @@ import { supabase } from '../config/supabase';
  * Test Supabase connection and database tables
  * This function checks:
  * 1. If we can connect to Supabase
- * 2. If all required tables exist
+ * 2. If tables exist by trying to select from them
  */
 export const testSupabaseConnection = async () => {
   try {
     console.log('Testing Supabase connection...');
     
-    // Test basic connection
-    const { data: tableData, error: tableError } = await supabase
-      .from('pg_tables')
-      .select('tablename')
-      .eq('schemaname', 'public');
+    // Simple check if we can reach Supabase at all
+    const { data: healthCheck, error: healthError } = await supabase.rpc('get_service_status').select();
     
-    if (tableError) {
-      console.error('Error connecting to Supabase:', tableError.message);
-      return { success: false, error: tableError.message };
+    if (healthError) {
+      if (healthError.message.includes('relation "public.pg_tables" does not exist')) {
+        // This error is expected, we can still proceed
+        console.log('Cannot access pg_tables, but connection appears to be working');
+      } else {
+        console.error('Error connecting to Supabase:', healthError.message);
+        return { success: false, error: healthError.message };
+      }
+    } else {
+      console.log('Supabase health check successful:', healthCheck);
     }
     
-    console.log('Successfully connected to Supabase!');
-    
-    // Check if our tables exist
+    // Check each table by trying to select from it
     const tables = ['profiles', 'experiences', 'education', 'skills', 'languages'];
-    const existingTables = tableData?.map(t => t.tablename) || [];
+    const existingTables = [];
+    const missingTables = [];
     
-    const missingTables = tables.filter(table => !existingTables.includes(table));
+    for (const table of tables) {
+      try {
+        const { data, error } = await supabase.from(table).select('*').limit(1);
+        
+        if (!error) {
+          existingTables.push(table);
+        } else if (error.message.includes('does not exist')) {
+          missingTables.push(table);
+        } else {
+          console.warn(`Error checking table ${table}:`, error.message);
+        }
+      } catch (err) {
+        missingTables.push(table);
+      }
+    }
     
     if (missingTables.length > 0) {
       console.warn(`Missing tables: ${missingTables.join(', ')}`);
@@ -38,7 +55,7 @@ export const testSupabaseConnection = async () => {
       };
     }
     
-    console.log('All tables exist:', tables.join(', '));
+    console.log('All tables exist:', existingTables.join(', '));
     return { success: true, tables: existingTables };
     
   } catch (error) {
@@ -53,18 +70,6 @@ export const testSupabaseConnection = async () => {
  */
 export const initializeSupabase = async () => {
   try {
-    // Check if we need to create tables
-    const { success, error, existingTables } = await testSupabaseConnection();
-    
-    if (!success) {
-      console.log('Connection test failed:', error);
-      console.log('Existing tables:', existingTables);
-      
-      // If you want to auto-create tables, you'd need to run SQL statements here
-      
-      return { success: false, error };
-    }
-    
     // Create a test user if needed
     const email = 'admin@example.com';
     const password = 'Password123!';
@@ -92,22 +97,27 @@ export const initializeSupabase = async () => {
       // Create user profile
       const user = data.user;
       if (user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: user.id,
-            full_name: 'Admin User',
-            title: 'Portfolio Owner',
-            about: 'This is a test profile.',
-            email: user.email,
-            phone: '123-456-7890',
-            location: 'New York, NY',
-            website: 'https://example.com'
-          });
-          
-        if (profileError) {
-          console.error('Error creating profile:', profileError.message);
-          return { success: false, error: profileError.message };
+        try {
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert({
+              id: user.id,
+              full_name: 'Admin User',
+              title: 'Portfolio Owner',
+              about: 'This is a test profile.',
+              email: user.email,
+              phone: '123-456-7890',
+              location: 'New York, NY',
+              website: 'https://example.com'
+            });
+            
+          if (profileError) {
+            console.error('Error creating profile:', profileError.message);
+            return { success: false, error: profileError.message };
+          }
+        } catch (profileErr) {
+          console.error('Error creating profile:', profileErr);
+          return { success: false, error: String(profileErr) };
         }
       }
       

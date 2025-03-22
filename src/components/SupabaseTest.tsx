@@ -31,12 +31,22 @@ const SupabaseTest: React.FC = () => {
             tables: result.tables || []
           });
         } else {
-          setStatus({
-            connected: false,
-            message: 'Failed to connect to Supabase',
-            tables: [],
-            error: result.error
-          });
+          // If the error is about pg_tables, it's okay - we just need to create the tables
+          if (result.error && result.error.includes('pg_tables')) {
+            setStatus({
+              connected: true,
+              message: 'Connected to Supabase, but tables may need to be created',
+              tables: result.existingTables || [],
+              error: 'Could not check all tables'
+            });
+          } else {
+            setStatus({
+              connected: false,
+              message: 'Failed to connect to Supabase',
+              tables: [],
+              error: result.error
+            });
+          }
         }
       } catch (error) {
         setStatus({
@@ -63,11 +73,20 @@ const SupabaseTest: React.FC = () => {
           message: 'Supabase initialized successfully!'
         }));
       } else {
-        setStatus(prev => ({
-          ...prev,
-          message: 'Failed to initialize Supabase',
-          error: result.error
-        }));
+        // If the error is about the table not existing, suggest creating tables first
+        if (result.error && result.error.includes('does not exist')) {
+          setStatus(prev => ({
+            ...prev,
+            message: 'Tables need to be created first',
+            error: 'Please click "Create Database Tables" before initializing'
+          }));
+        } else {
+          setStatus(prev => ({
+            ...prev,
+            message: 'Failed to initialize Supabase',
+            error: result.error
+          }));
+        }
       }
     } catch (error) {
       setStatus(prev => ({
@@ -92,8 +111,13 @@ const SupabaseTest: React.FC = () => {
         
         setStatus({
           connected: true,
-          message: 'Tables created successfully!',
-          tables: connectionResult.success ? connectionResult.tables || [] : []
+          message: result.partialSuccess 
+            ? 'Some tables created successfully, but others failed' 
+            : 'Tables created successfully!',
+          tables: connectionResult.success 
+            ? connectionResult.tables || [] 
+            : result.tables || [],
+          error: result.partialSuccess ? result.message : undefined
         });
       } else {
         setStatus(prev => ({
@@ -124,14 +148,14 @@ const SupabaseTest: React.FC = () => {
         
         {status.error && (
           <p className="mt-2 text-sm text-red-600 dark:text-red-400">
-            Error: {status.error}
+            {status.error}
           </p>
         )}
       </div>
       
       {status.tables.length > 0 && (
         <div className="mt-4">
-          <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">Available Tables:</h3>
+          <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">Detected Tables:</h3>
           <ul className="list-disc pl-5 text-gray-600 dark:text-gray-400">
             {status.tables.map(table => (
               <li key={table}>{table}</li>

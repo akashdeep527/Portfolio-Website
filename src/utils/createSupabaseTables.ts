@@ -1,6 +1,22 @@
 import { supabase } from '../config/supabase';
 
 /**
+ * Check if a table exists by trying to select from it
+ */
+const tableExists = async (tableName: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from(tableName)
+      .select('*')
+      .limit(1);
+    
+    return !error || !error.message.includes('does not exist');
+  } catch (err) {
+    return false;
+  }
+};
+
+/**
  * This utility function creates all the necessary tables in Supabase
  * directly from the browser. Use when you can't run the NodeJS setup script.
  */
@@ -82,75 +98,104 @@ export const createSupabaseTables = async () => {
       );
     `;
     
-    // Array of SQL statements to execute
-    const statements = [
-      createProfilesTable,
-      createExperiencesTable,
-      createEducationTable,
-      createSkillsTable,
-      createLanguagesTable
+    // Array of table names and their creation SQL
+    const tablesToCreate = [
+      { name: 'profiles', sql: createProfilesTable },
+      { name: 'experiences', sql: createExperiencesTable },
+      { name: 'education', sql: createEducationTable },
+      { name: 'skills', sql: createSkillsTable },
+      { name: 'languages', sql: createLanguagesTable }
     ];
     
-    // Execute each statement
-    for (const statement of statements) {
-      const { error } = await supabase.rpc('pgexec', { query: statement });
+    const createdTables = [];
+    const failedTables = [];
+    
+    // Check which tables need to be created
+    for (const table of tablesToCreate) {
+      const exists = await tableExists(table.name);
       
-      if (error) {
-        console.error('Error executing SQL:', error.message);
-        throw new Error(`SQL execution failed: ${error.message}`);
+      if (!exists) {
+        try {
+          console.log(`Creating table: ${table.name}`);
+          const { error } = await supabase.rpc('pgexec', { query: table.sql });
+          
+          if (error) {
+            console.error(`Error creating ${table.name}:`, error.message);
+            failedTables.push({ name: table.name, error: error.message });
+          } else {
+            createdTables.push(table.name);
+          }
+        } catch (err) {
+          console.error(`Error creating ${table.name}:`, err);
+          failedTables.push({ name: table.name, error: String(err) });
+        }
+      } else {
+        console.log(`Table ${table.name} already exists`);
+        createdTables.push(table.name);
       }
     }
     
-    // Set up Row Level Security (RLS)
-    const rlsStatements = [
+    // Set up Row Level Security (RLS) only if we successfully created tables
+    if (createdTables.length > 0) {
+      console.log('Setting up Row Level Security policies...');
+      
       // Enable RLS on tables
-      `ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;`,
-      `ALTER TABLE experiences ENABLE ROW LEVEL SECURITY;`,
-      `ALTER TABLE education ENABLE ROW LEVEL SECURITY;`,
-      `ALTER TABLE skills ENABLE ROW LEVEL SECURITY;`,
-      `ALTER TABLE languages ENABLE ROW LEVEL SECURITY;`,
+      const rlsEnableStatements = createdTables.map(table => 
+        `ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY;`
+      );
       
-      // Create policies for profiles
-      `CREATE POLICY "Users can view their own profile" ON profiles FOR SELECT USING (auth.uid() = id);`,
-      `CREATE POLICY "Users can update their own profile" ON profiles FOR UPDATE USING (auth.uid() = id);`,
+      // Profiles policies
+      const profilePolicies = [
+        `CREATE POLICY "Users can view their own profile" ON profiles FOR SELECT USING (auth.uid() = id);`,
+        `CREATE POLICY "Users can update their own profile" ON profiles FOR UPDATE USING (auth.uid() = id);`,
+        `CREATE POLICY "Users can insert their own profile" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);`
+      ];
       
-      // Create policies for experiences
-      `CREATE POLICY "Users can view their own experiences" ON experiences FOR SELECT USING (auth.uid() = user_id);`,
-      `CREATE POLICY "Users can insert their own experiences" ON experiences FOR INSERT WITH CHECK (auth.uid() = user_id);`,
-      `CREATE POLICY "Users can update their own experiences" ON experiences FOR UPDATE USING (auth.uid() = user_id);`,
-      `CREATE POLICY "Users can delete their own experiences" ON experiences FOR DELETE USING (auth.uid() = user_id);`,
+      // Policies for other tables
+      const otherTablesPolicies = ['experiences', 'education', 'skills', 'languages']
+        .filter(table => createdTables.includes(table))
+        .flatMap(table => [
+          `CREATE POLICY "Users can view their own ${table}" ON ${table} FOR SELECT USING (auth.uid() = user_id);`,
+          `CREATE POLICY "Users can insert their own ${table}" ON ${table} FOR INSERT WITH CHECK (auth.uid() = user_id);`,
+          `CREATE POLICY "Users can update their own ${table}" ON ${table} FOR UPDATE USING (auth.uid() = user_id);`,
+          `CREATE POLICY "Users can delete their own ${table}" ON ${table} FOR DELETE USING (auth.uid() = user_id);`
+        ]);
       
-      // Create policies for education
-      `CREATE POLICY "Users can view their own education" ON education FOR SELECT USING (auth.uid() = user_id);`,
-      `CREATE POLICY "Users can insert their own education" ON education FOR INSERT WITH CHECK (auth.uid() = user_id);`,
-      `CREATE POLICY "Users can update their own education" ON education FOR UPDATE USING (auth.uid() = user_id);`,
-      `CREATE POLICY "Users can delete their own education" ON education FOR DELETE USING (auth.uid() = user_id);`,
+      // All RLS statements
+      const rlsStatements = [
+        ...rlsEnableStatements,
+        ...profilePolicies,
+        ...otherTablesPolicies
+      ];
       
-      // Create policies for skills
-      `CREATE POLICY "Users can view their own skills" ON skills FOR SELECT USING (auth.uid() = user_id);`,
-      `CREATE POLICY "Users can insert their own skills" ON skills FOR INSERT WITH CHECK (auth.uid() = user_id);`,
-      `CREATE POLICY "Users can update their own skills" ON skills FOR UPDATE USING (auth.uid() = user_id);`,
-      `CREATE POLICY "Users can delete their own skills" ON skills FOR DELETE USING (auth.uid() = user_id);`,
-      
-      // Create policies for languages
-      `CREATE POLICY "Users can view their own languages" ON languages FOR SELECT USING (auth.uid() = user_id);`,
-      `CREATE POLICY "Users can insert their own languages" ON languages FOR INSERT WITH CHECK (auth.uid() = user_id);`,
-      `CREATE POLICY "Users can update their own languages" ON languages FOR UPDATE USING (auth.uid() = user_id);`,
-      `CREATE POLICY "Users can delete their own languages" ON languages FOR DELETE USING (auth.uid() = user_id);`
-    ];
-    
-    // Execute RLS statements
-    for (const statement of rlsStatements) {
-      const { error } = await supabase.rpc('pgexec', { query: statement });
-      
-      if (error) {
-        // Some errors are expected if policies already exist, so we'll just log them
-        console.warn('Warning executing RLS statement:', error.message);
+      // Execute RLS statements
+      for (const statement of rlsStatements) {
+        try {
+          const { error } = await supabase.rpc('pgexec', { query: statement });
+          
+          if (error && !error.message.includes('already exists')) {
+            console.warn('Warning executing RLS statement:', error.message);
+          }
+        } catch (err) {
+          console.warn('Warning executing RLS statement:', err);
+        }
       }
+    }
+    
+    if (failedTables.length > 0) {
+      const message = `Created ${createdTables.length} tables, but failed to create ${failedTables.length} tables: ${failedTables.map(t => t.name).join(', ')}`;
+      console.warn(message);
+      return { 
+        success: createdTables.length > 0, 
+        partialSuccess: createdTables.length > 0 && failedTables.length > 0,
+        createdTables,
+        failedTables,
+        message
+      };
     }
     
     console.log('All tables and policies have been created successfully!');
-    return { success: true };
+    return { success: true, tables: createdTables };
   } catch (error) {
     console.error('Failed to create tables:', error);
     return { success: false, error: String(error) };
