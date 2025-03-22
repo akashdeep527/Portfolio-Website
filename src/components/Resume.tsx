@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Car, Briefcase, GraduationCap, Languages, Award, Mail, Phone, MapPin, ChevronRight, PenTool as Tool, Gauge, Target, LogOut, User } from 'lucide-react';
+import { Car, Briefcase, GraduationCap, Languages, Award, Mail, Phone, MapPin, ChevronRight, PenTool as Tool, Gauge, Target, LogOut, User, Loader } from 'lucide-react';
 import { useResume } from '../context/ResumeContext';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
@@ -11,7 +11,7 @@ const iconMap: Record<string, React.ReactNode> = {
 };
 
 function Resume() {
-  const { data } = useResume();
+  const { data, loading } = useResume();
   const { isAuthenticated, user, logout } = useAuth();
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
@@ -42,6 +42,17 @@ function Resume() {
       window.location.href = '/';
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white flex items-center justify-center">
+        <div className="text-center">
+          <Loader className="w-12 h-12 text-blue-400 animate-spin mx-auto mb-4" />
+          <p className="text-xl">Loading your resume data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white">

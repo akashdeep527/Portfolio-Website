@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '../config/supabase';
 import { Session, User } from '@supabase/supabase-js';
+import { initializeUserProfile } from '../utils/initUserProfile';
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -57,7 +58,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const signUp = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signUp({ email, password });
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      
+      if (!error && data.user) {
+        // Initialize profile data for the new user
+        try {
+          await initializeUserProfile(data.user.id, email);
+        } catch (profileError) {
+          console.error("Error initializing profile data:", profileError);
+          // Continue with signup even if profile initialization fails
+        }
+      }
+      
       return { error };
     } catch (error) {
       return { error: error as Error };
