@@ -18,6 +18,7 @@ const SupabaseTest: React.FC = () => {
   });
   const [isInitializing, setIsInitializing] = useState(false);
   const [isCreatingTables, setIsCreatingTables] = useState(false);
+  const [sqlInstructions, setSqlInstructions] = useState<string | null>(null);
 
   useEffect(() => {
     const checkConnection = async () => {
@@ -110,6 +111,7 @@ const SupabaseTest: React.FC = () => {
 
   const handleCreateTables = async () => {
     setIsCreatingTables(true);
+    setSqlInstructions(null);
     
     try {
       const result = await createSupabaseTables();
@@ -120,15 +122,18 @@ const SupabaseTest: React.FC = () => {
         
         setStatus({
           connected: true,
-          message: result.partialSuccess 
-            ? 'Some tables created successfully, but others failed' 
-            : 'Tables created successfully!',
+          message: 'Tables created successfully!',
           tables: connectionResult.success 
             ? connectionResult.tables || [] 
             : result.tables || [],
-          error: result.partialSuccess ? result.message : undefined
+          error: undefined
         });
       } else {
+        // Check if we have SQL instructions
+        if (result.sqlInstructions) {
+          setSqlInstructions(result.sqlInstructions);
+        }
+        
         setStatus(prev => ({
           ...prev,
           message: 'Failed to create tables',
@@ -195,9 +200,26 @@ const SupabaseTest: React.FC = () => {
         First create tables, then initialize test data to create a test user and profile.
       </p>
       
+      {sqlInstructions && (
+        <div className="mt-6 overflow-auto max-h-96 border border-gray-300 rounded-md p-4 bg-gray-100 dark:bg-gray-900 dark:border-gray-700">
+          <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
+            SQL Instructions for Manual Setup
+          </h3>
+          <p className="mb-2 text-sm text-gray-600 dark:text-gray-400">
+            Please copy and run this SQL in the Supabase Dashboard SQL Editor:
+          </p>
+          <pre className="whitespace-pre-wrap text-xs font-mono text-gray-800 dark:text-gray-200 overflow-x-auto p-2 bg-gray-200 dark:bg-gray-800 rounded">
+            {sqlInstructions}
+          </pre>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            After running the SQL, refresh this page and try connecting again.
+          </p>
+        </div>
+      )}
+      
       <div className="mt-6 p-4 bg-gray-100 dark:bg-gray-700 rounded-md">
         <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">Test User Credentials:</h3>
-        <p className="text-gray-600 dark:text-gray-400">Email: admin@example.com</p>
+        <p className="text-gray-600 dark:text-gray-400">Email: test.user@gmail.com</p>
         <p className="text-gray-600 dark:text-gray-400">Password: Password123!</p>
       </div>
     </div>

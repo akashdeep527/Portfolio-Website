@@ -24,177 +24,152 @@ export const createSupabaseTables = async () => {
   try {
     console.log('Creating tables in Supabase...');
     
-    // Create profiles table
-    const createProfilesTable = `
-      CREATE TABLE IF NOT EXISTS profiles (
-        id UUID REFERENCES auth.users(id) PRIMARY KEY,
-        full_name TEXT NOT NULL,
-        title TEXT NOT NULL,
-        about TEXT,
-        email TEXT,
-        phone TEXT,
-        location TEXT,
-        website TEXT,
-        avatar_url TEXT,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-      );
-    `;
-    
-    // Create experiences table
-    const createExperiencesTable = `
-      CREATE TABLE IF NOT EXISTS experiences (
-        id BIGSERIAL PRIMARY KEY,
-        user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
-        company TEXT NOT NULL,
-        position TEXT NOT NULL,
-        start_date TEXT NOT NULL,
-        end_date TEXT,
-        description TEXT,
-        current BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-      );
-    `;
-    
-    // Create education table
-    const createEducationTable = `
-      CREATE TABLE IF NOT EXISTS education (
-        id BIGSERIAL PRIMARY KEY,
-        user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
-        institution TEXT NOT NULL,
-        degree TEXT NOT NULL,
-        field TEXT NOT NULL,
-        start_date TEXT NOT NULL,
-        end_date TEXT,
-        description TEXT,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-      );
-    `;
-    
-    // Create skills table
-    const createSkillsTable = `
-      CREATE TABLE IF NOT EXISTS skills (
-        id BIGSERIAL PRIMARY KEY,
-        user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
-        name TEXT NOT NULL,
-        level SMALLINT NOT NULL CHECK (level >= 1 AND level <= 5),
-        category TEXT NOT NULL,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-      );
-    `;
-    
-    // Create languages table
-    const createLanguagesTable = `
-      CREATE TABLE IF NOT EXISTS languages (
-        id BIGSERIAL PRIMARY KEY,
-        user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
-        name TEXT NOT NULL,
-        proficiency TEXT NOT NULL,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-      );
-    `;
-    
-    // Array of table names and their creation SQL
-    const tablesToCreate = [
-      { name: 'profiles', sql: createProfilesTable },
-      { name: 'experiences', sql: createExperiencesTable },
-      { name: 'education', sql: createEducationTable },
-      { name: 'skills', sql: createSkillsTable },
-      { name: 'languages', sql: createLanguagesTable }
+    // Define the expected tables
+    const expectedTables = [
+      'profiles', 
+      'experiences', 
+      'education', 
+      'skills', 
+      'languages'
     ];
     
     const createdTables: string[] = [];
     const failedTables: Array<{name: string, error: string}> = [];
     
-    // Check which tables need to be created
-    for (const table of tablesToCreate) {
-      const exists = await tableExists(table.name);
-      
-      if (!exists) {
-        try {
-          console.log(`Creating table: ${table.name}`);
-          const { error } = await supabase.rpc('pgexec', { query: table.sql });
-          
-          if (error) {
-            console.error(`Error creating ${table.name}:`, error.message);
-            failedTables.push({ name: table.name, error: error.message });
-          } else {
-            createdTables.push(table.name);
-          }
-        } catch (err) {
-          console.error(`Error creating ${table.name}:`, err);
-          failedTables.push({ name: table.name, error: String(err) });
-        }
+    // Check which tables already exist
+    for (const tableName of expectedTables) {
+      const exists = await tableExists(tableName);
+      if (exists) {
+        console.log(`Table ${tableName} already exists`);
+        createdTables.push(tableName);
       } else {
-        console.log(`Table ${table.name} already exists`);
-        createdTables.push(table.name);
-      }
-    }
-    
-    // Set up Row Level Security (RLS) only if we successfully created tables
-    if (createdTables.length > 0) {
-      console.log('Setting up Row Level Security policies...');
-      
-      // Enable RLS on tables
-      const rlsEnableStatements = createdTables.map(table => 
-        `ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY;`
-      );
-      
-      // Profiles policies
-      const profilePolicies = [
-        `CREATE POLICY "Users can view their own profile" ON profiles FOR SELECT USING (auth.uid() = id);`,
-        `CREATE POLICY "Users can update their own profile" ON profiles FOR UPDATE USING (auth.uid() = id);`,
-        `CREATE POLICY "Users can insert their own profile" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);`
-      ];
-      
-      // Policies for other tables
-      const otherTablesPolicies = ['experiences', 'education', 'skills', 'languages']
-        .filter(table => createdTables.includes(table))
-        .flatMap(table => [
-          `CREATE POLICY "Users can view their own ${table}" ON ${table} FOR SELECT USING (auth.uid() = user_id);`,
-          `CREATE POLICY "Users can insert their own ${table}" ON ${table} FOR INSERT WITH CHECK (auth.uid() = user_id);`,
-          `CREATE POLICY "Users can update their own ${table}" ON ${table} FOR UPDATE USING (auth.uid() = user_id);`,
-          `CREATE POLICY "Users can delete their own ${table}" ON ${table} FOR DELETE USING (auth.uid() = user_id);`
-        ]);
-      
-      // All RLS statements
-      const rlsStatements = [
-        ...rlsEnableStatements,
-        ...profilePolicies,
-        ...otherTablesPolicies
-      ];
-      
-      // Execute RLS statements
-      for (const statement of rlsStatements) {
-        try {
-          const { error } = await supabase.rpc('pgexec', { query: statement });
-          
-          if (error && !error.message.includes('already exists')) {
-            console.warn('Warning executing RLS statement:', error.message);
-          }
-        } catch (err) {
-          console.warn('Warning executing RLS statement:', err);
-        }
+        failedTables.push({ 
+          name: tableName, 
+          error: "Table doesn't exist and can't be created through the browser interface" 
+        });
       }
     }
     
     if (failedTables.length > 0) {
-      const message = `Created ${createdTables.length} tables, but failed to create ${failedTables.length} tables: ${failedTables.map(t => t.name).join(', ')}`;
+      // Generate SQL instructions for the user to run in Supabase Dashboard
+      const sqlInstructions = `
+-- Run this SQL in the Supabase Dashboard SQL Editor:
+
+-- Create profiles table
+CREATE TABLE IF NOT EXISTS profiles (
+  id UUID REFERENCES auth.users(id) PRIMARY KEY,
+  full_name TEXT NOT NULL,
+  title TEXT NOT NULL,
+  about TEXT,
+  email TEXT,
+  phone TEXT,
+  location TEXT,
+  website TEXT,
+  avatar_url TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create experiences table
+CREATE TABLE IF NOT EXISTS experiences (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  company TEXT NOT NULL,
+  position TEXT NOT NULL,
+  start_date TEXT NOT NULL,
+  end_date TEXT,
+  description TEXT,
+  current BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create education table
+CREATE TABLE IF NOT EXISTS education (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  institution TEXT NOT NULL,
+  degree TEXT NOT NULL,
+  field TEXT NOT NULL,
+  start_date TEXT NOT NULL,
+  end_date TEXT,
+  description TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create skills table
+CREATE TABLE IF NOT EXISTS skills (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  name TEXT NOT NULL,
+  level SMALLINT NOT NULL CHECK (level >= 1 AND level <= 5),
+  category TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create languages table
+CREATE TABLE IF NOT EXISTS languages (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  name TEXT NOT NULL,
+  proficiency TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Enable RLS on all tables
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE experiences ENABLE ROW LEVEL SECURITY;
+ALTER TABLE education ENABLE ROW LEVEL SECURITY;
+ALTER TABLE skills ENABLE ROW LEVEL SECURITY;
+ALTER TABLE languages ENABLE ROW LEVEL SECURITY;
+
+-- Set up RLS policies for profiles
+CREATE POLICY "Users can view their own profile" ON profiles FOR SELECT USING (auth.uid() = id);
+CREATE POLICY "Users can update their own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
+CREATE POLICY "Users can insert their own profile" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
+
+-- Set up RLS policies for experiences
+CREATE POLICY "Users can view their own experiences" ON experiences FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert their own experiences" ON experiences FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update their own experiences" ON experiences FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete their own experiences" ON experiences FOR DELETE USING (auth.uid() = user_id);
+
+-- Set up RLS policies for education
+CREATE POLICY "Users can view their own education" ON education FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert their own education" ON education FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update their own education" ON education FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete their own education" ON education FOR DELETE USING (auth.uid() = user_id);
+
+-- Set up RLS policies for skills
+CREATE POLICY "Users can view their own skills" ON skills FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert their own skills" ON skills FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update their own skills" ON skills FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete their own skills" ON skills FOR DELETE USING (auth.uid() = user_id);
+
+-- Set up RLS policies for languages
+CREATE POLICY "Users can view their own languages" ON languages FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert their own languages" ON languages FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update their own languages" ON languages FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete their own languages" ON languages FOR DELETE USING (auth.uid() = user_id);
+`;
+
+      console.log('SQL Instructions for manual table creation:', sqlInstructions);
+      
+      const message = `Browser-based table creation failed. Please use the SQL Editor in the Supabase Dashboard to create these tables: ${failedTables.map(t => t.name).join(', ')}`;
       console.warn(message);
+      
       return { 
-        success: createdTables.length > 0, 
-        partialSuccess: createdTables.length > 0 && failedTables.length > 0,
-        createdTables,
-        failedTables,
+        success: false,
+        error: "Tables need to be created in the Supabase Dashboard SQL Editor",
+        sqlInstructions,
         message
       };
     }
     
-    console.log('All tables and policies have been created successfully!');
+    console.log('All tables have been verified successfully!');
     return { success: true, tables: createdTables };
   } catch (error) {
     console.error('Failed to create tables:', error);

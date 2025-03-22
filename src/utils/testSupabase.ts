@@ -60,76 +60,108 @@ export const testSupabaseConnection = async () => {
 };
 
 /**
- * Initialize Supabase by creating a test user and profile
- * This helps verify that authentication and database operations work
+ * Initialize Supabase with a test user and profile
+ * This will create a test user if it doesn't already exist
  */
 export const initializeSupabase = async () => {
   try {
-    // Create a test user if needed
-    const email = 'admin@example.com';
-    const password = 'Password123!';
+    // Try to sign in with our test credentials
+    const testEmail = 'test.user@gmail.com'; // Changed from admin@example.com
+    const testPassword = 'Password123!';
     
-    // Check if user already exists by trying to sign in
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password
+    console.log('Checking if test user exists...');
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email: testEmail,
+      password: testPassword
     });
     
-    // If sign in failed because user doesn't exist, create the user
-    if (signInError && signInError.message.includes('Invalid login credentials')) {
-      console.log('Creating test user...');
+    // If we can sign in, the user already exists
+    if (signInData?.user) {
+      console.log('Test user already exists');
       
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password
-      });
+      // Check if profile exists
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', signInData.user.id)
+        .single();
       
-      if (signUpError) {
-        console.error('Error creating test user:', signUpError.message);
-        return { success: false, error: signUpError.message };
+      if (profileError && profileError.message.includes('does not exist')) {
+        // Table doesn't exist
+        return { success: false, error: 'The profiles table does not exist. Please create tables first.' };
       }
       
-      // Create user profile
-      const user = data.user;
-      if (user) {
-        try {
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .insert({
-              id: user.id,
-              full_name: 'Admin User',
-              title: 'Portfolio Owner',
-              about: 'This is a test profile.',
-              email: user.email,
-              phone: '123-456-7890',
-              location: 'New York, NY',
-              website: 'https://example.com'
-            });
-            
-          if (profileError) {
-            console.error('Error creating profile:', profileError.message);
-            return { success: false, error: profileError.message };
-          }
-        } catch (profileErr) {
-          console.error('Error creating profile:', profileErr);
-          return { success: false, error: String(profileErr) };
+      if (!profile) {
+        // Create profile for existing user
+        console.log('Creating profile for existing user');
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            id: signInData.user.id,
+            full_name: 'Test User',
+            title: 'Software Developer',
+            email: testEmail
+          });
+        
+        if (insertError) {
+          console.error('Error creating profile:', insertError);
+          return { success: false, error: insertError.message };
         }
       }
       
-      console.log('Test user created successfully!');
-      console.log('Email:', email);
-      console.log('Password:', password);
-    } else if (!signInError) {
-      console.log('Test user already exists.');
-    } else {
-      console.error('Error checking user:', signInError.message);
+      return { success: true };
+    }
+    
+    // If sign in fails with 'Invalid login credentials', we need to create the user
+    if (signInError && signInError.message.includes('Invalid login credentials')) {
+      console.log('Test user does not exist, creating...');
+      
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: testEmail,
+        password: testPassword
+      });
+      
+      if (signUpError) {
+        console.error('Error creating test user:', signUpError);
+        return { success: false, error: signUpError.message };
+      }
+      
+      if (!signUpData?.user) {
+        return { success: false, error: 'Failed to create user' };
+      }
+      
+      console.log('Test user created, inserting profile data');
+      
+      // Create profile for new user
+      const { error: insertError } = await supabase
+        .from('profiles')
+        .insert({
+          id: signUpData.user.id,
+          full_name: 'Test User',
+          title: 'Software Developer',
+          email: testEmail
+        });
+      
+      if (insertError) {
+        console.error('Error creating profile:', insertError);
+        if (insertError.message.includes('does not exist')) {
+          return { success: false, error: 'The profiles table does not exist. Please create tables first.' };
+        }
+        return { success: false, error: insertError.message };
+      }
+      
+      return { success: true };
+    }
+    
+    // Any other error
+    if (signInError) {
+      console.error('Error checking for existing user:', signInError);
       return { success: false, error: signInError.message };
     }
     
-    return { success: true };
-    
+    return { success: false, error: 'Unknown error initializing Supabase' };
   } catch (error) {
-    console.error('Unexpected error initializing Supabase:', error);
+    console.error('Error initializing Supabase:', error);
     return { success: false, error: String(error) };
   }
 }; 
