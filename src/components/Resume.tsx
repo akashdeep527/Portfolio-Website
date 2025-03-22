@@ -10,10 +10,11 @@ const iconMap: Record<string, React.ReactNode> = {
   Tool: <Tool className="w-12 h-12 text-blue-400 mx-auto mb-4" />
 };
 
-function Resume() {
-  const { data, loading } = useResume();
+export function Resume() {
+  const { data, loading, syncAllData, isSyncing } = useResume();
   const { isAuthenticated, user, logout } = useAuth();
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [syncMessage, setSyncMessage] = useState("");
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -43,6 +44,30 @@ function Resume() {
     }
   };
 
+  // Function to handle sync button click
+  const handleSync = async () => {
+    if (!isAuthenticated) {
+      setSyncMessage("Please log in to sync data");
+      setTimeout(() => setSyncMessage(""), 3000);
+      return;
+    }
+
+    try {
+      setSyncMessage("Syncing data...");
+      const success = await syncAllData();
+      if (success) {
+        setSyncMessage("Data synced successfully!");
+      } else {
+        setSyncMessage("Error syncing data. Please try again.");
+      }
+      setTimeout(() => setSyncMessage(""), 3000);
+    } catch (error) {
+      console.error("Sync error:", error);
+      setSyncMessage("Error syncing data. Please try again.");
+      setTimeout(() => setSyncMessage(""), 3000);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white flex items-center justify-center">
@@ -60,8 +85,8 @@ function Resume() {
       <div className="absolute top-4 right-4 z-20 flex space-x-4">
         {isAuthenticated ? (
           <>
-            <Link 
-              to="/admin" 
+            <Link
+              to="/admin"
               className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded shadow transition-colors flex items-center"
             >
               <User className="w-4 h-4 mr-2" />
@@ -74,17 +99,34 @@ function Resume() {
               <LogOut className="w-4 h-4 mr-2" />
               Logout
             </button>
+            {/* Sync Button */}
+            <button
+              onClick={handleSync}
+              disabled={isSyncing}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded shadow transition-colors flex items-center disabled:opacity-50"
+            >
+              {isSyncing ? (
+                <div className="flex items-center justify-center">
+                  <span className="mr-2">Syncing</span>
+                  <div className="animate-spin h-4 w-4 border-2 border-white rounded-full border-t-transparent"></div>
+                </div>
+              ) : (
+                <>
+                  <span className="mr-2">Sync Data</span>
+                </>
+              )}
+            </button>
           </>
         ) : (
           <>
-            <Link 
-              to="/login" 
+            <Link
+              to="/login"
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded shadow transition-colors"
             >
               Login
             </Link>
-            <Link 
-              to="/signup" 
+            <Link
+              to="/signup"
               className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded shadow transition-colors"
             >
               Sign Up
@@ -92,6 +134,14 @@ function Resume() {
           </>
         )}
       </div>
+      
+      {/* Sync message notification */}
+      {syncMessage && (
+        <div className="fixed top-16 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 rounded shadow-lg text-center max-w-md w-full"
+             style={{ backgroundColor: syncMessage.includes("success") ? 'rgba(52, 211, 153, 0.9)' : 'rgba(251, 191, 36, 0.9)' }}>
+          {syncMessage}
+        </div>
+      )}
       
       {/* Hero Section */}
       <header className="relative h-[50vh] flex items-center justify-center overflow-hidden">
@@ -280,5 +330,3 @@ function Resume() {
     </div>
   );
 }
-
-export default Resume;

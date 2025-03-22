@@ -3,6 +3,7 @@ import initialData from '../data';
 import { ResumeData } from '../types';
 import { useAuth } from './AuthContext';
 import * as resumeService from '../services/resumeService';
+import { syncDataWithSupabase } from '../utils/syncDataWithSupabase';
 
 interface ResumeContextType {
   data: ResumeData;
@@ -14,6 +15,8 @@ interface ResumeContextType {
   updateSkills: (skills: ResumeData['skills']) => Promise<void>;
   updateLanguages: (languages: ResumeData['languages']) => Promise<void>;
   resetData: () => Promise<void>;
+  syncAllData: () => Promise<boolean>;
+  isSyncing: boolean;
 }
 
 const ResumeContext = createContext<ResumeContextType | undefined>(undefined);
@@ -90,6 +93,7 @@ export const ResumeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   
   const [data, setData] = useState<ResumeData>(initialData);
   const [loading, setLoading] = useState<boolean>(true);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
   // Load data from Supabase when user changes or on auth state change
   useEffect(() => {
@@ -256,6 +260,30 @@ export const ResumeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     // Note: This doesn't delete data from Supabase, just resets the local state
   };
 
+  // Function to sync all data to Supabase
+  const syncAllData = async (): Promise<boolean> => {
+    if (!isAuthenticated || !user) {
+      console.error('Cannot sync data: User not authenticated');
+      return false;
+    }
+    
+    setIsSyncing(true);
+    try {
+      const success = await syncDataWithSupabase(user.id, data);
+      if (success) {
+        console.log('All data successfully synced with Supabase');
+      } else {
+        console.error('Failed to sync some data with Supabase');
+      }
+      return success;
+    } catch (error) {
+      console.error('Error syncing data with Supabase:', error);
+      return false;
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   return (
     <ResumeContext.Provider value={{
       data,
@@ -266,7 +294,9 @@ export const ResumeProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       updateEducation,
       updateSkills,
       updateLanguages,
-      resetData
+      resetData,
+      syncAllData,
+      isSyncing
     }}>
       {children}
     </ResumeContext.Provider>
