@@ -10,6 +10,7 @@ import EducationEditor from './components/admin/EducationEditor';
 import SkillsEditor from './components/admin/SkillsEditor';
 import LanguagesEditor from './components/admin/LanguagesEditor';
 import StatsEditor from './components/admin/StatsEditor';
+import SupabaseTest from './components/SupabaseTest';
 import { ResumeProvider } from './context/ResumeContext';
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
@@ -22,6 +23,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Resume />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/supabase-test" element={<SupabaseTest />} />
             <Route 
               path="/admin" 
               element={
